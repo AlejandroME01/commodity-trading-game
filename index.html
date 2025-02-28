@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commodity Trading Simulation</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.4;
+            background-color: #f0f0f0;
+        }
+        #game-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .hidden {
+            display: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .input-form {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        input[type="number"] {
+            padding: 8px;
+            width: 150px;
+        }
+        button {
+            padding: 10px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .trade-summary {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .order-book-container {
+            display: flex;
+            justify-content: space-between;
+        }
+        .order-book-side {
+            width: 48%;
+        }
+        .up-arrow {
+            color: green;
+        }
+        .down-arrow {
+            color: red;
+        }
+        .start-button {
+            width: 200px;
+            height: 50px;
+            font-size: 18px;
+            margin: 20px auto;
+            display: block;
+        }
+        .highlight {
+            background-color: #fffae6;
+        }
+        #results-container {
+            margin-top: 30px;
+        }
+        .result-section {
+            margin-bottom: 20px;
+        }
+        #market-info, #commodity-detail, #price-entry, #results {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .profit {
+            color: green;
+        }
+        .loss {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Intraday Soft Commodity Market Making Simulation</h1>
+    
+    <div id="intro-container" class="section">
+        <h2>Welcome to the Commodity Trading Simulation</h2>
+        <p>You are a market maker for soft commodities on a trading day. Your goal is to profit from the bid-ask spread while managing risk.</p>
+        <h3>Market Making Challenge:</h3>
+        <ul>
+            <li>Use the given price, execution probability, and volume information</li>
+            <li>Calculate expected profit and expected value yourself</li>
+            <li>Find the optimal balance between execution chance and profit margin</li>
+            <li>Remember: Expected Value = Execution Probability × Expected Profit</li>
+        </ul>
+        <button id="start-game" class="start-button">Start Simulation</button>
+    </div>
+
+    <div id="game-container" class="hidden">
+        <div id="market-info" class="section">
+            <h2>Market Information</h2>
+            <div id="market-event"></div>
+            <div id="portfolio-summary"></div>
+            <table id="market-overview">
+                <thead>
+                    <tr>
+                        <th>Commodity</th>
+                        <th>Market Price</th>
+                        <th>1hr Forecast</th>
+                        <th>Trend</th>
+                        <th>Market Depth</th>
+                    </tr>
+                </thead>
+                <tbody id="market-overview-body"></tbody>
+            </table>
+        </div>
+
+        <div id="commodity-detail" class="section hidden">
+            <h2 id="commodity-name"></h2>
+            <div id="commodity-info"></div>
+            
+            <div class="section">
+                <h3>Recent Trades</h3>
+                <table id="recent-trades">
+                    <thead>
+                        <tr>
+                            <th>Time (mins ago)</th>
+                            <th>Price</th>
+                            <th>Volume</th>
+                            <th>Direction</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-trades-body"></tbody>
+                </table>
+            </div>
+            
+            <div class="section">
+                <h3>Order Book</h3>
+                <div class="order-book-container">
+                    <div class="order-book-side">
+                        <h4>BID</h4>
+                        <table id="bid-book">
+                            <thead>
+                                <tr>
+                                    <th>Volume</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bid-book-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="order-book-side">
+                        <h4>ASK</h4>
+                        <table id="ask-book">
+                            <thead>
+                                <tr>
+                                    <th>Price</th>
+                                    <th>Volume</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ask-book-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="market-spread"></div>
+            </div>
+            
+            <div class="section">
+                <h3>BID OPTIONS (Buy prices)</h3>
+                <table id="bid-options">
+                    <thead>
+                        <tr>
+                            <th>Price</th>
+                            <th>Execution %</th>
+                            <th>Exp. Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bid-options-body"></tbody>
+                </table>
+                
+                <h3>ASK OPTIONS (Sell prices)</h3>
+                <table id="ask-options">
+                    <thead>
+                        <tr>
+                            <th>Price</th>
+                            <th>Execution %</th>
+                            <th>Exp. Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ask-options-body"></tbody>
+                </table>
+                
+                <div id="forecast-info"></div>
+            </div>
+            
+            <div id="price-entry" class="section">
+                <h3>Set Your Prices</h3>
+                <div class="input-form">
+                    <div>
+                        <label for="bid-price">Your Bid Price (Buy):</label>
+                        <input type="number" id="bid-price" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="ask-price">Your Ask Price (Sell):</label>
+                        <input type="number" id="ask-price" step="0.01" required>
+                    </div>
+                    <button id="submit-prices">Submit Prices</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="commodity-selection" class="section">
+            <h2>Select a Commodity to Trade</h2>
+            <div id="commodity-buttons"></div>
+        </div>
+
+        <div id="results-container" class="hidden">
+            <div id="results" class="section">
+                <h2>Trading Results (30-Minute Window)</h2>
+                <div class="result-section">
+                    <h3>Summary</h3>
+                    <table id="results-summary">
+                        <thead>
+                            <tr>
+                                <th>Commodity</th>
+                                <th>Bid Price</th>
+                                <th>Ask Price</th>
+                                <th>Bought</th>
+                                <th>Sold</th>
+                                <th>Profit/Loss</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-summary-body"></tbody>
+                    </table>
+                    <div id="total-profit" class="trade-summary"></div>
+                </div>
+                
+                <div class="result-section">
+                    <h3>Trade Execution Details</h3>
+                    <div id="trade-details"></div>
+                </div>
+                
+                <div class="result-section">
+                    <h3>Final Portfolio</h3>
+                    <div id="final-portfolio"></div>
+                </div>
+                
+                <div class="result-section">
+                    <h3>Performance Analysis</h3>
+                    <div id="performance-analysis"></div>
+                </div>
+                
+                <button id="play-again" class="start-button">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
