@@ -12,7 +12,7 @@ This simulator:
 
 ## Why I Made This
 
-After watching this video from [QuantGuild](https://www.youtube.com/watch?v=A9o2El2FN_M), I found that it really intersting that he managed to simplify market making and the concept of EV by gamifying the lesson. When I first tied learning about this I found most of the info out there is either super basic or way too complex, so I wanted to build something in the middle.
+After watching this video from [QuantGuild](https://www.youtube.com/watch?v=A9o2El2FN_M), I found that it really intersting that he managed to simplify market making and the concept of EV by gamifying the lesson. When I first tried learning about this I found most of the info out there is either super basic or way too complex, so I wanted to build something in the middle.
 
 The simulator isn't 100% accurate to how institutional market makers work (they have way more complex models and way more money), but it does capture some key concepts:
 - The trade-off between spread width and execution probability
