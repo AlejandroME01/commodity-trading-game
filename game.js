@@ -128,7 +128,7 @@ const marketDepthInfo = {
     }
 };
 
-// Eventos de mercado intraday - mas relevantes para materias primas 
+// Eventos de mercado intraday
 const marketEvents = [
     { 
         description: "Weather report affecting growing regions", 
