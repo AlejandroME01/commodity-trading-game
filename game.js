@@ -1,5 +1,5 @@
 // Intraday Soft Commodity Market Making Simulation
-// Web browser version
+// Version para browser
 
 // Game state and data
 const gameState = {
@@ -20,7 +20,90 @@ const gameState = {
         { name: "Orange Juice", basePrice: 338.70, volatility: 0.04, unit: "pound", marketDepth: "low" }
     ],
     currentCommodity: null,
-    commoditiesTraded: 0
+    commoditiesTraded: 0,
+    // News database for forecast explanations
+    newsDatabase: {
+        "Coffee": {
+            up: [
+                "Brazilian frost threatens arabica crops",
+                "Colombia reports lower-than-expected harvest yields",
+                "Major coffee chain announces expansion plans",
+                "Vietnamese robusta exports delayed by port congestion",
+                "Global coffee consumption projected to rise 3% this year"
+            ],
+            down: [
+                "Record harvest expected in Vietnam",
+                "Brazilian production exceeds estimates",
+                "Major importer reduces purchase forecasts",
+                "New study suggests declining coffee consumption among millennials",
+                "Warehouses report increased stockpiles across major ports"
+            ]
+        },
+        "Cocoa": {
+            up: [
+                "West African dry weather threatens crop yield",
+                "Ivory Coast reports cocoa disease outbreak",
+                "Chocolate manufacturers increase production targets",
+                "Ghana implements minimum price policy for farmers",
+                "Valentine's Day demand exceeds expectations"
+            ],
+            down: [
+                "Record harvest expected in Ivory Coast",
+                "Ghana reports bumper crop season",
+                "European grindings data shows decreased demand",
+                "Chocolate manufacturers reduce cocoa butter usage",
+                "New processing facilities increase processing capacity"
+            ]
+        },
+        "Sugar": {
+            up: [
+                "Brazilian ethanol demand diverts sugarcane from sugar production",
+                "India considers export restrictions after dry season",
+                "Thailand reports crop damage from flooding",
+                "EU reduces domestic production quotas",
+                "Global sugar consumption rises faster than expected"
+            ],
+            down: [
+                "Brazilian harvest exceeds expectations",
+                "India announces export subsidies",
+                "Thailand reports record sugarcane harvest",
+                "Health concerns reduce soft drink consumption",
+                "China increases domestic beet sugar production"
+            ]
+        },
+        "Cotton": {
+            up: [
+                "Texas drought affects US cotton belt",
+                "Chinese textile mills increase purchase orders",
+                "India restricts cotton exports",
+                "Fast fashion industry expands production",
+                "Pakistan reports crop damage from flooding"
+            ],
+            down: [
+                "US farmers plant record acreage",
+                "Chinese demand slows amid economic concerns",
+                "India reports record harvest",
+                "Synthetic fabrics gain market share",
+                "Warehouse inventories reach five-year high"
+            ]
+        },
+        "Orange Juice": {
+            up: [
+                "Florida citrus greening disease spreads further",
+                "Brazilian frost damages orange groves",
+                "Health trend increases juice consumption",
+                "Mexico reports lower-than-expected harvest",
+                "Hurricane damages reduce Florida crop estimates"
+            ],
+            down: [
+                "Florida reports disease-free growing season",
+                "Brazil increases production forecasts",
+                "Consumer shift to low-sugar beverages continues",
+                "USDA increases crop yield estimates",
+                "New orange varieties increase juice yield per fruit"
+            ]
+        }
+    }
 };
 
 // Market data for additional context
@@ -45,7 +128,7 @@ const marketDepthInfo = {
     }
 };
 
-// Intraday market events - more subtle and relevant to soft commodities
+// Eventos de mercado intraday - mas relevantes para materias primas 
 const marketEvents = [
     { 
         description: "Weather report affecting growing regions", 
@@ -97,6 +180,12 @@ const marketEvents = [
     }
 ];
 
+// Generate a random news headline for a forecast
+function getNewsForForecast(commodity, direction, strength) {
+    const news = gameState.newsDatabase[commodity][direction];
+    return news[Math.floor(Math.random() * news.length)];
+}
+
 // Recent trading activity simulation
 function generateRecentTrades(commodity, currentPrice) {
     const trades = [];
@@ -130,7 +219,7 @@ function generateMarketPrices() {
     const orderBooks = {};
     
     gameState.commodities.forEach(commodity => {
-        // Generate a random but small price movement (intraday)
+        // Generar un movimiento de precio random
         const randomMovement = (Math.random() - 0.5) * 2 * commodity.volatility * 0.3; // Reduced for intraday
         
         // Apply event effect only to affected commodities
@@ -188,13 +277,18 @@ function generateShortTermForecasts(currentPrices) {
         
         // Include trend strength indicator
         const trendStrength = Math.abs(shortTermMovement) > (commodity.volatility * 0.2) ? "strong" : "weak";
+        const direction = estimatedChange >= 0 ? "up" : "down";
+        
+        // Get relevant news for this forecast
+        const news = getNewsForForecast(commodity.name, direction, trendStrength);
         
         forecasts[commodity.name] = {
             price: Math.round((currentPrices[commodity.name] + estimatedChange) * 100) / 100,
             timeframe: "1 hour",
-            direction: estimatedChange >= 0 ? "up" : "down",
+            direction: direction,
             strength: trendStrength,
-            changePct: Math.round((estimatedChange / currentPrices[commodity.name]) * 10000) / 100 // For EV calculations
+            changePct: Math.round((estimatedChange / currentPrices[commodity.name]) * 10000) / 100, // For EV calculations
+            news: news
         };
     });
     
@@ -245,12 +339,12 @@ function calculateExpectedValue(action, price, commodity, marketPrice, forecast,
     // Clamp probability to reasonable range
     executionProbability = Math.max(0, Math.min(0.95, executionProbability));
     
-    // Calculate expected trade volume
+    // Calcular volumen EV
     const avgVolumePerTrade = 5;
     const volumeFactor = commodityData.marketDepth === "high" ? 3 : commodityData.marketDepth === "medium" ? 2 : 1;
     const expectedVolume = executionProbability * avgVolumePerTrade * volumeFactor;
     
-    // Calculate expected profit
+    // Calcular profit EV
     let expectedProfit;
     if (action === "bid") {
         // For bid, profit = expected future price - bid price
@@ -319,14 +413,19 @@ function simulateIntraDayTrading(commodity, buyPrice, sellPrice, marketPrice, fo
     // Process sells to player (player buys)
     for (let i = 0; i < potentialSellsToPlayer; i++) {
         const volume = Math.floor(Math.random() * 3) + 1; // 1-3 units per trade
-        totalBuys += volume;
         
-        trades.push({
-            direction: "buy",
-            price: buyPrice,
-            volume: volume,
-            time: Math.floor(Math.random() * 30) // Random minute in the 30-min window
-        });
+        // Check if player has enough cash for this purchase
+        const potentialCost = buyPrice * volume;
+        if (gameState.playerCash >= potentialCost) {
+            totalBuys += volume;
+            
+            trades.push({
+                direction: "buy",
+                price: buyPrice,
+                volume: volume,
+                time: Math.floor(Math.random() * 30) // Random minute in the 30-min window
+            });
+        }
     }
     
     // Process buys from player (player sells)
@@ -363,7 +462,7 @@ function simulateIntraDayTrading(commodity, buyPrice, sellPrice, marketPrice, fo
     };
 }
 
-// Initialize the game
+// Initialize game
 function initializeGame() {
     // Reset game state
     gameState.playerCash = 10000;
@@ -437,7 +536,7 @@ function displayMarketOverview() {
     });
 }
 
-// Set up commodity selection buttons
+// Configurar botones para escoger comms
 function setupCommodityButtons() {
     const commodityButtons = document.getElementById('commodity-buttons');
     commodityButtons.innerHTML = '';
@@ -489,6 +588,7 @@ function displayCommodityDetail(commodity) {
     commodityInfo.innerHTML = `
         <p><strong>Current price:</strong> $${price.toFixed(2)} per ${commodity.unit}</p>
         <p><strong>1-hour forecast:</strong> $${forecast.price.toFixed(2)} (${forecast.direction}, ${forecast.strength} trend)</p>
+        <p><strong>Market news:</strong> ${forecast.news}</p>
         <p><strong>Expected price change:</strong> ${forecast.changePct > 0 ? '+' : ''}${forecast.changePct}% in next hour</p>
         <p><strong>Market depth:</strong> ${commodity.marketDepth} - ${marketDepthInfo[commodity.marketDepth].description}</p>
         <p><strong>Holding cost:</strong> ~${marketDepthInfo[commodity.marketDepth].holdingCost}% per hour</p>
@@ -595,7 +695,8 @@ function displayPriceOptions(commodity) {
         `;
     });
     
-    // Display ask options (without EV)
+    
+// Display ask options (without EV)
     evAnalysis.askOptions.forEach(option => {
         askOptionsBody.innerHTML += `
             <tr>
@@ -663,6 +764,16 @@ function setupPriceInputs(commodity) {
             return;
         }
         
+        // Calculate maximum possible buy volume based on cash available
+        const commodityPrice = gameState.currentPrices[commodity.name];
+        const maxPossibleVolume = Math.floor(gameState.playerCash / bidValue);
+        
+        // Check if the player can potentially buy any units at this bid price
+        if (maxPossibleVolume <= 0) {
+            alert('You don\'t have enough cash to buy at this bid price. Lower your bid or trade a different commodity.');
+            return;
+        }
+        
         submitPrices(commodity, bidValue, askValue);
     });
 }
@@ -673,7 +784,7 @@ function submitPrices(commodity, bidPrice, askPrice) {
     const forecast = gameState.forecasts[commodity.name];
     const orderBook = gameState.orderBooks[commodity.name];
     
-   // Simulate trading
+    // Simulate trading
     const tradingResult = simulateIntraDayTrading(
         commodity,
         bidPrice,
@@ -752,7 +863,7 @@ function displayFinalResults() {
     // Final portfolio
     displayFinalPortfolio();
     
-    // Performance analysis
+    // Checar PnL
     displayPerformanceAnalysis();
     
     // Set up play again button
@@ -880,18 +991,18 @@ function displayPerformanceAnalysis() {
     
     performanceAnalysis.innerHTML += `<p><strong>Profitable commodities:</strong> ${profitableCommodities} of ${Object.keys(gameState.tradingResults).length}</p>`;
     
-    // Market maker rating
+    // Sistema de Ratings
     let rating;
     if (performancePct >= 1.0) {
-        rating = "Elite Market Maker";
+        rating = "Elite;
     } else if (performancePct >= 0.5) {
-        rating = "Advanced Market Maker";
+        rating = "Advanced";
     } else if (performancePct >= 0.1) {
-        rating = "Skilled Market Maker";
+        rating = "Skilledr";
     } else if (performancePct >= 0) {
-        rating = "Novice Market Maker";
+        rating = "Novice";
     } else {
-        rating = "Needs Improvement";
+        rating = "Needs";
     }
     
     performanceAnalysis.innerHTML += `<p><strong>Your market maker rating:</strong> ${rating}</p>`;
@@ -910,4 +1021,3 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeGame();
     });
 });
-        
