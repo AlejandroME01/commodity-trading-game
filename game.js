@@ -429,7 +429,485 @@ function displayMarketOverview() {
         marketOverviewBody.innerHTML += `
             <tr>
                 <td>${commodity.name}</td>
-                <td>${gameState.currentPrices[commodity.name].toFixed(2)}</td>
-                <td>${forecast.price.toFixed(2)}</td>
+                <td>$${gameState.currentPrices[commodity.name].toFixed(2)}</td>
+                <td>$${forecast.price.toFixed(2)}</td>
                 <td class="${trendClass}">${trendStrength}</td>
                 <td>${commodity.marketDepth}</td>
+            </tr>`;
+    });
+}
+
+// Set up commodity selection buttons
+function setupCommodityButtons() {
+    const commodityButtons = document.getElementById('commodity-buttons');
+    commodityButtons.innerHTML = '';
+    
+    gameState.commodities.forEach(commodity => {
+        // Check if this commodity has already been traded
+        const isTraded = gameState.tradingResults[commodity.name] !== undefined;
+        
+        const button = document.createElement('button');
+        button.textContent = commodity.name;
+        button.style.margin = '5px';
+        button.style.padding = '10px 15px';
+        
+        // Disable button if already traded
+        if (isTraded) {
+            button.disabled = true;
+            button.style.opacity = '0.5';
+        } else {
+            button.addEventListener('click', () => {
+                selectCommodity(commodity);
+            });
+        }
+        
+        commodityButtons.appendChild(button);
+    });
+}
+
+// Select a commodity to trade
+function selectCommodity(commodity) {
+    gameState.currentCommodity = commodity;
+    
+    // Hide commodity selection, show commodity detail
+    document.getElementById('commodity-selection').classList.add('hidden');
+    document.getElementById('commodity-detail').classList.remove('hidden');
+    
+    // Display commodity details
+    displayCommodityDetail(commodity);
+}
+
+// Display detailed information for a specific commodity
+function displayCommodityDetail(commodity) {
+    const commodityName = document.getElementById('commodity-name');
+    commodityName.textContent = commodity.name;
+    
+    const commodityInfo = document.getElementById('commodity-info');
+    const price = gameState.currentPrices[commodity.name];
+    const forecast = gameState.forecasts[commodity.name];
+    
+    commodityInfo.innerHTML = `
+        <p><strong>Current price:</strong> $${price.toFixed(2)} per ${commodity.unit}</p>
+        <p><strong>1-hour forecast:</strong> $${forecast.price.toFixed(2)} (${forecast.direction}, ${forecast.strength} trend)</p>
+        <p><strong>Expected price change:</strong> ${forecast.changePct > 0 ? '+' : ''}${forecast.changePct}% in next hour</p>
+        <p><strong>Market depth:</strong> ${commodity.marketDepth} - ${marketDepthInfo[commodity.marketDepth].description}</p>
+        <p><strong>Holding cost:</strong> ~${marketDepthInfo[commodity.marketDepth].holdingCost}% per hour</p>
+    `;
+    
+    // Display recent trades
+    displayRecentTrades(commodity);
+    
+    // Display order book
+    displayOrderBook(commodity);
+    
+    // Display price options with EV analysis
+    displayPriceOptions(commodity);
+    
+    // Set up price inputs
+    setupPriceInputs(commodity);
+}
+
+// Display recent trades for a commodity
+function displayRecentTrades(commodity) {
+    const recentTradesBody = document.getElementById('recent-trades-body');
+    recentTradesBody.innerHTML = '';
+    
+    const trades = gameState.recentTrades[commodity.name];
+    
+    trades.forEach(trade => {
+        const directionClass = trade.direction === 'buy' ? 'up-arrow' : 'down-arrow';
+        
+        recentTradesBody.innerHTML += `
+            <tr>
+                <td>${trade.time}</td>
+                <td>$${trade.price.toFixed(2)}</td>
+                <td>${trade.volume}</td>
+                <td class="${directionClass}">${trade.direction}</td>
+            </tr>
+        `;
+    });
+}
+
+// Display order book for a commodity
+function displayOrderBook(commodity) {
+    const bidBookBody = document.getElementById('bid-book-body');
+    const askBookBody = document.getElementById('ask-book-body');
+    const marketSpread = document.getElementById('market-spread');
+    
+    bidBookBody.innerHTML = '';
+    askBookBody.innerHTML = '';
+    
+    const orderBook = gameState.orderBooks[commodity.name];
+    
+    // Display bids
+    orderBook.bids.forEach(bid => {
+        bidBookBody.innerHTML += `
+            <tr>
+                <td>${bid.volume}</td>
+                <td>$${bid.price.toFixed(2)}</td>
+            </tr>
+        `;
+    });
+    
+    // Display asks
+    orderBook.asks.forEach(ask => {
+        askBookBody.innerHTML += `
+            <tr>
+                <td>$${ask.price.toFixed(2)}</td>
+                <td>${ask.volume}</td>
+            </tr>
+        `;
+    });
+    
+    // Calculate and display market spread
+    const topBid = orderBook.bids[0].price;
+    const topAsk = orderBook.asks[0].price;
+    const spread = topAsk - topBid;
+    const spreadPct = (spread / topBid) * 100;
+    
+    marketSpread.innerHTML = `<p><strong>Current market spread:</strong> $${spread.toFixed(2)} (${spreadPct.toFixed(2)}%)</p>`;
+}
+
+// Display price options with EV calculations
+function displayPriceOptions(commodity) {
+    const bidOptionsBody = document.getElementById('bid-options-body');
+    const askOptionsBody = document.getElementById('ask-options-body');
+    const forecastInfo = document.getElementById('forecast-info');
+    
+    bidOptionsBody.innerHTML = '';
+    askOptionsBody.innerHTML = '';
+    
+    const price = gameState.currentPrices[commodity.name];
+    const forecast = gameState.forecasts[commodity.name];
+    const orderBook = gameState.orderBooks[commodity.name];
+    
+    // Generate EV table
+    const evAnalysis = generateEVTable(commodity, price, forecast, orderBook, gameState.currentEvent);
+    
+    // Display bid options (without EV)
+    evAnalysis.bidOptions.forEach(option => {
+        bidOptionsBody.innerHTML += `
+            <tr>
+                <td>$${option.price.toFixed(2)}</td>
+                <td>${(option.executionProbability * 100).toFixed(0)}%</td>
+                <td>${option.expectedVolume.toFixed(1)}</td>
+            </tr>
+        `;
+    });
+    
+    // Display ask options (without EV)
+    evAnalysis.askOptions.forEach(option => {
+        askOptionsBody.innerHTML += `
+            <tr>
+                <td>$${option.price.toFixed(2)}</td>
+                <td>${(option.executionProbability * 100).toFixed(0)}%</td>
+                <td>${option.expectedVolume.toFixed(1)}</td>
+            </tr>
+        `;
+    });
+    
+    // Display forecast info and holding cost
+    forecastInfo.innerHTML = `
+        <p><strong>Forecast price:</strong> $${forecast.price.toFixed(2)} | <strong>Market price:</strong> $${price.toFixed(2)}</p>
+        <p><strong>Holding cost:</strong> ~$${(price * marketDepthInfo[commodity.marketDepth].holdingCost / 100).toFixed(2)} per unit per hour</p>
+    `;
+}
+
+// Set up price input handlers
+function setupPriceInputs(commodity) {
+    const bidPriceInput = document.getElementById('bid-price');
+    const askPriceInput = document.getElementById('ask-price');
+    const submitButton = document.getElementById('submit-prices');
+    
+    const price = gameState.currentPrices[commodity.name];
+    
+    // Set min and max values
+    const minBid = price * 0.98;
+    const maxBid = price * 1.005;
+    const minAsk = price;
+    const maxAsk = price * 1.02;
+    
+    // Set default values
+    bidPriceInput.value = price.toFixed(2);
+    bidPriceInput.min = minBid.toFixed(2);
+    bidPriceInput.max = maxBid.toFixed(2);
+    bidPriceInput.step = 0.01;
+    
+    askPriceInput.value = (price * 1.005).toFixed(2);
+    askPriceInput.min = price.toFixed(2);
+    askPriceInput.max = maxAsk.toFixed(2);
+    askPriceInput.step = 0.01;
+    
+    // Ensure ask is greater than bid
+    bidPriceInput.addEventListener('input', () => {
+        const bidValue = parseFloat(bidPriceInput.value);
+        if (!isNaN(bidValue) && askPriceInput.value < bidValue) {
+            askPriceInput.value = bidValue;
+        }
+    });
+    
+    askPriceInput.addEventListener('input', () => {
+        const askValue = parseFloat(askPriceInput.value);
+        if (!isNaN(askValue) && bidPriceInput.value > askValue) {
+            bidPriceInput.value = askValue;
+        }
+    });
+    
+    // Submit button handler
+    submitButton.addEventListener('click', () => {
+        const bidValue = parseFloat(bidPriceInput.value);
+        const askValue = parseFloat(askPriceInput.value);
+        
+        if (isNaN(bidValue) || isNaN(askValue) || bidValue < minBid || bidValue > maxBid || askValue < minAsk || askValue > maxAsk) {
+            alert('Please enter valid bid and ask prices within the allowed range.');
+            return;
+        }
+        
+        submitPrices(commodity, bidValue, askValue);
+    });
+}
+
+// Submit prices and simulate trading
+function submitPrices(commodity, bidPrice, askPrice) {
+    const price = gameState.currentPrices[commodity.name];
+    const forecast = gameState.forecasts[commodity.name];
+    const orderBook = gameState.orderBooks[commodity.name];
+    
+   // Simulate trading
+    const tradingResult = simulateIntraDayTrading(
+        commodity,
+        bidPrice,
+        askPrice,
+        price,
+        forecast,
+        orderBook,
+        gameState.currentEvent
+    );
+    
+    // Update inventory and cash
+    gameState.inventory[commodity.name] += tradingResult.buys - tradingResult.sells;
+    gameState.playerCash += tradingResult.profit;
+    
+    // Store result
+    gameState.tradingResults[commodity.name] = {
+        buys: tradingResult.buys,
+        sells: tradingResult.sells,
+        profit: tradingResult.profit,
+        trades: tradingResult.trades,
+        price: price,
+        bidPrice: bidPrice,
+        askPrice: askPrice
+    };
+    
+    gameState.totalProfit += tradingResult.profit;
+    gameState.commoditiesTraded++;
+    
+    // Check if all commodities traded
+    if (gameState.commoditiesTraded === gameState.commodities.length) {
+        displayFinalResults();
+    } else {
+        // Return to commodity selection
+        document.getElementById('commodity-detail').classList.add('hidden');
+        document.getElementById('commodity-selection').classList.remove('hidden');
+        
+        // Update buttons
+        setupCommodityButtons();
+    }
+}
+
+// Display final results
+function displayFinalResults() {
+    // Hide game sections, show results
+    document.getElementById('commodity-detail').classList.add('hidden');
+    document.getElementById('commodity-selection').classList.add('hidden');
+    document.getElementById('results-container').classList.remove('hidden');
+    
+    // Populate results summary
+    const resultsSummaryBody = document.getElementById('results-summary-body');
+    resultsSummaryBody.innerHTML = '';
+    
+    for (const commodityName in gameState.tradingResults) {
+        const result = gameState.tradingResults[commodityName];
+        const profitClass = result.profit >= 0 ? 'profit' : 'loss';
+        
+        resultsSummaryBody.innerHTML += `
+            <tr>
+                <td>${commodityName}</td>
+                <td>$${result.bidPrice.toFixed(2)}</td>
+                <td>$${result.askPrice.toFixed(2)}</td>
+                <td>${result.buys}</td>
+                <td>${result.sells}</td>
+                <td class="${profitClass}">$${result.profit.toFixed(2)}</td>
+            </tr>
+        `;
+    }
+    
+    const totalProfitElement = document.getElementById('total-profit');
+    const totalProfitClass = gameState.totalProfit >= 0 ? 'profit' : 'loss';
+    totalProfitElement.innerHTML = `<p class="${totalProfitClass}">Total profit/loss: $${gameState.totalProfit.toFixed(2)}</p>`;
+    
+    // Trade details
+    displayTradeDetails();
+    
+    // Final portfolio
+    displayFinalPortfolio();
+    
+    // Performance analysis
+    displayPerformanceAnalysis();
+    
+    // Set up play again button
+    document.getElementById('play-again').addEventListener('click', () => {
+        document.getElementById('results-container').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        initializeGame();
+    });
+}
+
+// Display trade execution details
+function displayTradeDetails() {
+    const tradeDetails = document.getElementById('trade-details');
+    tradeDetails.innerHTML = '';
+    
+    for (const commodityName in gameState.tradingResults) {
+        const result = gameState.tradingResults[commodityName];
+        
+        if (result.trades.length > 0) {
+            tradeDetails.innerHTML += `
+                <h4>${commodityName} Trades:</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time (min)</th>
+                            <th>Direction</th>
+                            <th>Price</th>
+                            <th>Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            result.trades.forEach(trade => {
+                tradeDetails.innerHTML += `
+                    <tr>
+                        <td>${trade.time}</td>
+                        <td>${trade.direction}</td>
+                        <td>$${trade.price.toFixed(2)}</td>
+                        <td>${trade.volume}</td>
+                    </tr>
+                `;
+            });
+            
+            tradeDetails.innerHTML += `
+                    </tbody>
+                </table>
+            `;
+        } else {
+            tradeDetails.innerHTML += `<p>${commodityName}: No trades executed</p>`;
+        }
+    }
+}
+
+// Display final portfolio
+function displayFinalPortfolio() {
+    const finalPortfolio = document.getElementById('final-portfolio');
+    finalPortfolio.innerHTML = `<p><strong>Cash:</strong> $${gameState.playerCash.toFixed(2)}</p>`;
+    
+    let totalInventoryValue = 0;
+    let inventoryItems = 0;
+    
+    finalPortfolio.innerHTML += `<p><strong>Commodity Inventory:</strong></p>`;
+    let inventoryList = '<ul>';
+    
+    for (const commodity in gameState.inventory) {
+        if (gameState.inventory[commodity] > 0) {
+            const commodityData = gameState.commodities.find(c => c.name === commodity);
+            const value = gameState.inventory[commodity] * gameState.currentPrices[commodity];
+            totalInventoryValue += value;
+            inventoryItems++;
+            
+            inventoryList += `<li>${commodity}: ${gameState.inventory[commodity]} ${commodityData.unit}s (Worth: $${value.toFixed(2)})</li>`;
+        }
+    }
+    
+    if (inventoryItems === 0) {
+        inventoryList += '<li>No commodities in inventory</li>';
+    }
+    
+    inventoryList += '</ul>';
+    finalPortfolio.innerHTML += inventoryList;
+    
+    if (totalInventoryValue > 0) {
+        finalPortfolio.innerHTML += `<p><strong>Total inventory value:</strong> $${totalInventoryValue.toFixed(2)}</p>`;
+    }
+    
+    finalPortfolio.innerHTML += `<p><strong>Total portfolio value:</strong> $${(gameState.playerCash + totalInventoryValue).toFixed(2)}</p>`;
+}
+
+// Display performance analysis
+function displayPerformanceAnalysis() {
+    const performanceAnalysis = document.getElementById('performance-analysis');
+    
+    // Calculate performance
+    const totalInventoryValue = Object.keys(gameState.inventory).reduce((sum, commodity) => {
+        return sum + (gameState.inventory[commodity] * gameState.currentPrices[commodity]);
+    }, 0);
+    
+    const performance = gameState.playerCash + totalInventoryValue - 10000;
+    const performancePct = (performance / 10000) * 100;
+    
+    const performanceClass = performance >= 0 ? 'profit' : 'loss';
+    performanceAnalysis.innerHTML = `<p class="${performanceClass}"><strong>Profit/Loss:</strong> $${performance.toFixed(2)} (${performancePct.toFixed(2)}%)</p>`;
+    
+    // Trading efficiency metrics
+    let effectiveSpreads = 0;
+    let totalTrades = 0;
+    let profitableCommodities = 0;
+    
+    for (const commodity in gameState.tradingResults) {
+        const result = gameState.tradingResults[commodity];
+        if (result.profit > 0) profitableCommodities++;
+        
+        if (result.buys > 0 || result.sells > 0) {
+            effectiveSpreads += (result.askPrice - result.bidPrice);
+            totalTrades++;
+        }
+    }
+    
+    if (totalTrades > 0) {
+        const avgSpread = effectiveSpreads / totalTrades;
+        performanceAnalysis.innerHTML += `<p><strong>Average spread:</strong> $${avgSpread.toFixed(2)}</p>`;
+    }
+    
+    performanceAnalysis.innerHTML += `<p><strong>Profitable commodities:</strong> ${profitableCommodities} of ${Object.keys(gameState.tradingResults).length}</p>`;
+    
+    // Market maker rating
+    let rating;
+    if (performancePct >= 1.0) {
+        rating = "Elite Market Maker";
+    } else if (performancePct >= 0.5) {
+        rating = "Advanced Market Maker";
+    } else if (performancePct >= 0.1) {
+        rating = "Skilled Market Maker";
+    } else if (performancePct >= 0) {
+        rating = "Novice Market Maker";
+    } else {
+        rating = "Needs Improvement";
+    }
+    
+    performanceAnalysis.innerHTML += `<p><strong>Your market maker rating:</strong> ${rating}</p>`;
+    
+    if (performancePct > 0) {
+        performanceAnalysis.innerHTML += `<p>Annualized, this 30-minute performance would be equivalent to <strong>${(performancePct * 48 * 252).toFixed(2)}%</strong> return!</p>`;
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Start button
+    document.getElementById('start-game').addEventListener('click', () => {
+        document.getElementById('intro-container').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        initializeGame();
+    });
+});
+        
