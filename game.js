@@ -994,7 +994,7 @@ function displayPerformanceAnalysis() {
     // Sistema de Ratings
     let rating;
     if (performancePct >= 1.0) {
-        rating = "Elite;
+        rating = "Elite";
     } else if (performancePct >= 0.5) {
         rating = "Advanced";
     } else if (performancePct >= 0.1) {
